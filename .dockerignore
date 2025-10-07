@@ -1,0 +1,14 @@
+node_modules
+dist
+data
+portkey-config
+.env
+.git
+.gitignore
+*.log
+.DS_Store
+*.md
+docs
+web/node_modules
+web/dist
+

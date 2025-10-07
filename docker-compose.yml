@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  llm-gateway-ui:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./portkey-config:/app/portkey-config
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/data/gateway.db
+      - PORTKEY_CONFIG_PATH=/app/portkey-config/conf.json
+      - LOG_LEVEL=info
+      - JWT_SECRET=${JWT_SECRET:-please-change-this-secret-key-to-a-random-string-at-least-32-chars}
+    restart: unless-stopped
+

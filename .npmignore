@@ -1,0 +1,42 @@
+# Source files
+src/
+web/src/
+
+# Development files
+.env
+.env.example
+tsconfig.json
+web/tsconfig.json
+web/tsconfig.node.json
+web/vite.config.ts
+
+# Documentation
+CONTRIBUTING.md
+CHANGELOG.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+data/
+*.db
+
+# Config
+portkey-config/
+
+# Node
+node_modules/
+

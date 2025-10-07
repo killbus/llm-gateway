@@ -1,0 +1,86 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f5f7fa;
+  min-height: 100vh;
+  font-variant-numeric: tabular-nums;
+}
+
+#app {
+  width: 100%;
+  height: 100vh;
+  background: transparent;
+}
+
+.n-card {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+}
+
+.n-modal-container .n-card {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+}
+
+.n-modal-mask {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.n-button {
+  transition: background-color 0.2s ease;
+  font-family: inherit;
+}
+
+.n-data-table {
+  background: transparent;
+}
+
+.n-data-table .n-data-table-th {
+  background: rgba(248, 249, 250, 0.8);
+  font-weight: 600;
+  font-size: 13px;
+  color: #595959;
+}
+
+.n-data-table .n-data-table-td {
+  font-size: 13px;
+  color: #262626;
+}
+
+.n-data-table .n-data-table-tr:hover {
+  background: rgba(24, 160, 88, 0.03);
+}
+
+.n-input,
+.n-select,
+.n-auto-complete {
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.n-alert {
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.n-tag {
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.n-statistic {
+  font-family: inherit;
+}
+
+.n-progress {
+  font-family: inherit;
+}
+

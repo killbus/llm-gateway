@@ -1,0 +1,478 @@
+<template>
+  <div class="providers-view">
+    <n-space vertical :size="12">
+      <n-space justify="space-between" align="center">
+        <h2 class="page-title">提供商管理</h2>
+        <n-space :size="8">
+          <n-dropdown :options="exportOptions" @select="handleExportSelect">
+            <n-button size="small">
+              <template #icon>
+                <n-icon><DownloadIcon /></n-icon>
+              </template>
+              导出
+            </n-button>
+          </n-dropdown>
+          <n-upload
+            :show-file-list="false"
+            accept=".json"
+            @change="handleImportFile"
+          >
+            <n-button size="small">
+              <template #icon>
+                <n-icon><UploadIcon /></n-icon>
+              </template>
+              导入
+            </n-button>
+          </n-upload>
+          <n-button type="primary" size="small" @click="showModal = true">
+            添加提供商
+          </n-button>
+        </n-space>
+      </n-space>
+
+      <ProviderOverview :providers="providerStore.providers" />
+
+      <n-card class="table-card">
+        <n-data-table
+          :columns="columns"
+          :data="providerStore.providers"
+          :loading="providerStore.loading"
+          :pagination="{ pageSize: 10 }"
+          :bordered="false"
+          size="small"
+          :single-line="false"
+        />
+      </n-card>
+    </n-space>
+
+    <n-modal
+      v-model:show="showModal"
+      preset="card"
+      :title="editingId ? '编辑提供商' : '添加提供商'"
+      class="provider-modal"
+      :style="{ width: '950px', maxHeight: '50vh' }"
+    >
+      <div class="modal-content">
+        <n-tabs v-if="!editingId" v-model:value="activeTab" type="line" size="small">
+          <n-tab-pane name="preset" tab="选择预设">
+            <ProviderPresetSelector v-model="selectedPreset" />
+            <n-space justify="end" style="margin-top: 12px">
+              <n-button @click="usePreset" :disabled="!selectedPreset" type="primary" size="small">
+                使用此预设
+              </n-button>
+            </n-space>
+          </n-tab-pane>
+          <n-tab-pane name="custom" tab="自定义配置">
+            <ProviderForm ref="formRef" v-model="formValue" :editing-id="editingId" />
+          </n-tab-pane>
+        </n-tabs>
+        <ProviderForm v-else ref="formRef" v-model="formValue" :editing-id="editingId" />
+      </div>
+      <template #footer>
+        <n-space justify="end" :size="8">
+          <n-button @click="showModal = false" size="small">取消</n-button>
+          <n-button
+            v-if="!editingId && activeTab === 'custom'"
+            type="primary"
+            size="small"
+            :loading="submitting"
+            @click="handleSubmit"
+          >
+            创建
+          </n-button>
+          <n-button
+            v-if="editingId"
+            type="primary"
+            size="small"
+            :loading="submitting"
+            @click="handleSubmit"
+          >
+            更新
+          </n-button>
+        </n-space>
+      </template>
+    </n-modal>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, h, onMounted } from 'vue';
+import { useMessage, useDialog, NSpace, NButton, NDataTable, NCard, NModal, NTag, NPopconfirm, NTabs, NTabPane, NDropdown, NUpload, NIcon, type UploadFileInfo } from 'naive-ui';
+import { Download as DownloadIcon, CloudUpload as UploadIcon } from '@vicons/ionicons5';
+import { useProviderStore } from '@/stores/provider';
+import { useModelStore } from '@/stores/model';
+import { providerApi } from '@/api/provider';
+import { modelApi } from '@/api/model';
+import type { Provider } from '@/types';
+import ProviderPresetSelector from '@/components/ProviderPresetSelector.vue';
+import ProviderForm from '@/components/ProviderForm.vue';
+import ProviderOverview from '@/components/ProviderOverview.vue';
+import type { ProviderPreset } from '@/constants/providers';
+import { downloadProvidersConfig, parseImportFile } from '@/utils/provider-export';
+
+const message = useMessage();
+const dialog = useDialog();
+const providerStore = useProviderStore();
+const modelStore = useModelStore();
+
+const showModal = ref(false);
+const formRef = ref();
+const submitting = ref(false);
+const editingId = ref<string | null>(null);
+const activeTab = ref('preset');
+const selectedPreset = ref<ProviderPreset | null>(null);
+
+const exportOptions = [
+  {
+    label: '导出所有提供商',
+    key: 'all',
+  },
+  {
+    label: '仅导出已启用的提供商',
+    key: 'enabled',
+  },
+];
+
+const formValue = ref({
+  id: '',
+  name: '',
+  baseUrl: '',
+  apiKey: '',
+  enabled: true,
+});
+
+const originalApiKey = ref('');
+const apiKeyChanged = ref(false);
+
+
+
+const columns = [
+  { title: 'ID', key: 'id' },
+  { title: '名称', key: 'name' },
+  { title: 'Base URL', key: 'baseUrl' },
+  {
+    title: '状态',
+    key: 'enabled',
+    render: (row: Provider) => h(NTag, { type: row.enabled ? 'success' : 'default' }, { default: () => row.enabled ? '启用' : '禁用' }),
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    render: (row: Provider) => h(NSpace, null, {
+      default: () => [
+        h(NButton, { size: 'small', onClick: () => handleTest(row.id) }, { default: () => '测试' }),
+        h(NButton, { size: 'small', onClick: () => handleEdit(row) }, { default: () => '编辑' }),
+        h(NPopconfirm, {
+          onPositiveClick: () => handleDelete(row.id),
+        }, {
+          trigger: () => h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
+          default: () => '确定删除此提供商吗？',
+        }),
+      ],
+    }),
+  },
+];
+
+async function handleEdit(provider: Provider) {
+  editingId.value = provider.id;
+  apiKeyChanged.value = false;
+
+  try {
+    const fullProvider = await providerApi.getById(provider.id, true);
+    originalApiKey.value = fullProvider.apiKey || '';
+
+    formValue.value = {
+      id: fullProvider.id,
+      name: fullProvider.name,
+      baseUrl: fullProvider.baseUrl,
+      apiKey: fullProvider.apiKey || '',
+      enabled: fullProvider.enabled,
+    };
+  } catch (error: any) {
+    message.error('获取提供商信息失败: ' + error.message);
+    return;
+  }
+
+  showModal.value = true;
+}
+
+async function handleTest(id: string) {
+  try {
+    const result = await providerApi.test(id);
+    if (result.success) {
+      message.success(result.message);
+    } else {
+      message.error(result.message);
+    }
+  } catch (error: any) {
+    message.error(error.message);
+  }
+}
+
+async function handleDelete(id: string) {
+  try {
+    await providerApi.delete(id);
+    message.success('删除成功');
+    await providerStore.fetchProviders();
+  } catch (error: any) {
+    message.error(error.message);
+  }
+}
+
+async function handleSubmit() {
+  try {
+    await formRef.value?.validate();
+
+    if (editingId.value && formValue.value.apiKey !== originalApiKey.value) {
+      apiKeyChanged.value = true;
+      const confirmed = await new Promise<boolean>((resolve) => {
+        dialog.warning({
+          title: 'API Key 已变更',
+          content: '检测到您修改了 API Key，确定要保存新的密钥吗？',
+          positiveText: '确定保存',
+          negativeText: '取消',
+          onPositiveClick: () => {
+            resolve(true);
+          },
+          onNegativeClick: () => {
+            resolve(false);
+          },
+          onClose: () => {
+            resolve(false);
+          },
+        });
+      });
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    submitting.value = true;
+
+    if (editingId.value) {
+      const updateData: any = {
+        name: formValue.value.name,
+        baseUrl: formValue.value.baseUrl,
+        enabled: formValue.value.enabled,
+      };
+      if (formValue.value.apiKey !== originalApiKey.value) {
+        updateData.apiKey = formValue.value.apiKey;
+      }
+      await providerApi.update(editingId.value, updateData);
+
+      const selectedModelsInfo = formRef.value?.getSelectedModelsInfo?.() || [];
+      if (selectedModelsInfo.length > 0) {
+        const existing = modelStore.models.filter(m => m.providerId === formValue.value.id);
+        const modelsToCreate = selectedModelsInfo
+          .filter((model: any) => !existing.some(e => e.modelIdentifier === model.id))
+          .map((model: any) => ({
+            name: model.name || model.id,
+            providerId: formValue.value.id,
+            modelIdentifier: model.id,
+            enabled: true,
+          }));
+
+        if (modelsToCreate.length > 0) {
+          try {
+            await modelApi.batchCreate(modelsToCreate);
+            await modelStore.fetchModels();
+            message.success(`更新成功，新增 ${modelsToCreate.length} 个模型`);
+          } catch (error: any) {
+            message.warning(`提供商更新成功，但部分模型创建失败: ${error.message}`);
+          }
+        } else {
+          message.success('更新成功');
+        }
+      } else {
+        message.success('更新成功');
+      }
+    } else {
+      const selectedModelsInfo = formRef.value?.getSelectedModelsInfo?.() || [];
+
+      await providerApi.create(formValue.value);
+
+      if (selectedModelsInfo.length > 0) {
+        const modelsToCreate = selectedModelsInfo.map((model: any) => ({
+          name: model.name || model.id,
+          providerId: formValue.value.id,
+          modelIdentifier: model.id,
+          enabled: true,
+        }));
+
+        try {
+          await modelApi.batchCreate(modelsToCreate);
+          // 刷新模型列表以确保新创建的模型能被其他页面看到
+          await modelStore.fetchModels();
+          message.success(`创建成功，已添加 ${selectedModelsInfo.length} 个模型`);
+        } catch (error: any) {
+          message.warning(`提供商创建成功，但部分模型创建失败: ${error.message}`);
+        }
+      } else {
+        message.success('创建成功');
+      }
+    }
+
+    showModal.value = false;
+    resetForm();
+    await providerStore.fetchProviders();
+  } catch (error: any) {
+    if (error.message) {
+      message.error(error.message);
+    }
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function resetForm() {
+  editingId.value = null;
+  activeTab.value = 'preset';
+  selectedPreset.value = null;
+  originalApiKey.value = '';
+  apiKeyChanged.value = false;
+  formValue.value = {
+    id: '',
+    name: '',
+    baseUrl: '',
+    apiKey: '',
+    enabled: true,
+  };
+}
+
+function usePreset() {
+  if (!selectedPreset.value) return;
+
+  formValue.value = {
+    id: selectedPreset.value.id,
+    name: selectedPreset.value.name,
+    baseUrl: selectedPreset.value.baseUrl,
+    apiKey: '',
+    enabled: true,
+  };
+  activeTab.value = 'custom';
+}
+
+function handleExportSelect(key: string) {
+  const providers = key === 'enabled'
+    ? providerStore.providers.filter(p => p.enabled)
+    : providerStore.providers;
+
+  if (providers.length === 0) {
+    message.warning('没有可导出的提供商');
+    return;
+  }
+
+  downloadProvidersConfig(providers);
+  message.success(`已导出 ${providers.length} 个提供商配置`);
+}
+
+async function handleImportFile(data: { file: Required<UploadFileInfo>; fileList: Required<UploadFileInfo>[]; event?: Event | ProgressEvent<EventTarget> }) {
+  const file = data.file.file;
+
+  if (!file) {
+    message.error('文件为空，无法导入');
+    return;
+  }
+
+  try {
+    const { data, validation } = await parseImportFile(file);
+
+    if (!validation.isValid) {
+      message.error(`导入失败: ${validation.errors.join(', ')}`);
+      return;
+    }
+
+    if (validation.warnings.length > 0) {
+      message.warning(`导入警告: ${validation.warnings.join(', ')}`);
+    }
+
+    if (data) {
+      message.success(`配置文件验证通过，包含 ${data.providers.length} 个提供商配置`);
+      // 这里可以添加导入确认对话框
+      // 暂时只显示成功消息
+    }
+  } catch (error: any) {
+    message.error(`导入失败: ${error.message}`);
+  }
+}
+
+onMounted(() => {
+  providerStore.fetchProviders();
+});
+</script>
+
+<style scoped>
+.providers-view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0;
+}
+
+.table-card {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+  overflow-x: auto;
+}
+
+.provider-modal :deep(.n-card) {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+}
+
+.provider-modal :deep(.n-card__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.provider-modal :deep(.n-card__content) {
+  padding: 16px 20px;
+  max-height: calc(50vh - 140px);
+  overflow-y: auto;
+}
+
+.provider-modal :deep(.n-card__content)::-webkit-scrollbar {
+  width: 6px;
+}
+
+.provider-modal :deep(.n-card__content)::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.provider-modal :deep(.n-card__content)::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 3px;
+}
+
+.provider-modal :deep(.n-card__content)::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+.provider-modal :deep(.n-card__footer) {
+  padding: 12px 20px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.modal-content {
+  min-height: 200px;
+}
+
+.provider-modal :deep(.n-tabs-nav) {
+  padding: 0;
+}
+
+.provider-modal :deep(.n-tabs-tab) {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+</style>
+

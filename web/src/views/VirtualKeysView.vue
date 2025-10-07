@@ -1,0 +1,391 @@
+<template>
+  <div class="virtual-keys-view">
+    <n-space vertical :size="12">
+      <n-space justify="space-between" align="center">
+        <h2 class="page-title">虚拟密钥管理</h2>
+        <n-button type="primary" size="small" @click="showModal = true">
+          创建虚拟密钥
+        </n-button>
+      </n-space>
+
+      <n-card class="table-card">
+        <n-data-table
+          :columns="columns"
+          :data="virtualKeyStore.virtualKeys"
+          :loading="virtualKeyStore.loading"
+          :pagination="{ pageSize: 10 }"
+          :bordered="false"
+          size="small"
+        />
+      </n-card>
+    </n-space>
+
+    <n-modal
+      v-model:show="showModal"
+      preset="card"
+      :title="editingId ? '编辑虚拟密钥' : '创建虚拟密钥'"
+      class="key-modal"
+      :style="{ width: '600px', maxHeight: '50vh' }"
+    >
+      <n-form ref="formRef" :model="formValue" :rules="rules" label-placement="left" label-width="90" size="small">
+        <n-form-item label="密钥名称" path="name">
+          <n-input v-model:value="formValue.name" placeholder="如: 生产环境密钥" size="small" />
+        </n-form-item>
+        <n-form-item label="关联模型" path="modelIds">
+          <n-select
+            v-model:value="formValue.modelIds"
+            :options="modelOptions"
+            placeholder="选择一个或多个模型"
+            filterable
+            multiple
+            clearable
+            size="small"
+          />
+        </n-form-item>
+        <n-form-item v-if="!editingId" label="生成方式" path="keyType">
+          <n-radio-group v-model:value="formValue.keyType" size="small">
+            <n-space :size="12">
+              <n-radio value="auto">自动生成</n-radio>
+              <n-radio value="custom">自定义</n-radio>
+            </n-space>
+          </n-radio-group>
+        </n-form-item>
+        <n-form-item v-if="!editingId && formValue.keyType === 'custom'" label="自定义密钥" path="customKey">
+          <n-input v-model:value="formValue.customKey" placeholder="8-64字符,仅支持字母、数字、下划线、连字符" size="small" />
+        </n-form-item>
+        <n-form-item label="速率限制" path="rateLimit">
+          <n-input-number v-model:value="formValue.rateLimit" placeholder="请求/分钟" :min="0" style="width: 100%" size="small" />
+        </n-form-item>
+        <n-form-item label="启用">
+          <n-switch v-model:value="formValue.enabled" size="small" />
+        </n-form-item>
+      </n-form>
+      <template #footer>
+        <n-space justify="end" :size="8">
+          <n-button @click="showModal = false" size="small">取消</n-button>
+          <n-button type="primary" :loading="submitting" @click="handleSubmit" size="small">
+            {{ editingId ? '更新' : '创建' }}
+          </n-button>
+        </n-space>
+      </template>
+    </n-modal>
+
+    <n-modal v-model:show="showKeyModal" preset="card" title="虚拟密钥已创建" style="width: 500px">
+      <n-space vertical>
+        <n-alert type="success">
+          密钥创建成功！请妥善保管密钥值。
+        </n-alert>
+        <n-input-group>
+          <n-input :value="createdKeyValue" readonly />
+          <n-button @click="copyKey">复制</n-button>
+        </n-input-group>
+      </n-space>
+      <template #footer>
+        <n-space justify="end">
+          <n-button type="primary" @click="showKeyModal = false">确定</n-button>
+        </n-space>
+      </template>
+    </n-modal>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, h, computed, onMounted, watch } from 'vue';
+import {
+  useMessage,
+  NSpace,
+  NButton,
+  NDataTable,
+  NCard,
+  NModal,
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NSwitch,
+  NTag,
+  NPopconfirm,
+  NSelect,
+  NRadioGroup,
+  NRadio,
+  NAlert,
+  NInputGroup,
+} from 'naive-ui';
+import { useVirtualKeyStore } from '@/stores/virtual-key';
+import { useModelStore } from '@/stores/model';
+import { virtualKeyApi } from '@/api/virtual-key';
+import type { VirtualKey } from '@/types';
+
+const message = useMessage();
+const virtualKeyStore = useVirtualKeyStore();
+const modelStore = useModelStore();
+
+const showModal = ref(false);
+const showKeyModal = ref(false);
+const formRef = ref();
+const submitting = ref(false);
+const editingId = ref<string | null>(null);
+const createdKeyValue = ref('');
+
+const formValue = ref({
+  name: '',
+  modelIds: [] as string[],
+  keyType: 'auto' as 'auto' | 'custom',
+  customKey: '',
+  rateLimit: undefined as number | undefined,
+  enabled: true,
+});
+
+const modelOptions = computed(() => {
+  return modelStore.models
+    .filter(m => m.enabled)
+    .map(m => ({
+      label: `${m.name} (${m.providerName})`,
+      value: m.id,
+    }));
+});
+
+const rules = {
+  name: [{ required: true, message: '请输入密钥名称', trigger: 'blur' }],
+  modelIds: [
+    {
+      required: true,
+      validator: (_rule: any, value: string[]) => {
+        if (!value || value.length === 0) {
+          return new Error('请至少选择一个模型');
+        }
+        return true;
+      },
+      trigger: 'change',
+    },
+  ],
+  customKey: [
+    {
+      required: true,
+      validator: (_rule: any, value: string) => {
+        if (formValue.value.keyType === 'custom' && !value) {
+          return new Error('请输入自定义密钥');
+        }
+        return true;
+      },
+      trigger: 'blur',
+    },
+  ],
+};
+
+const columns = [
+  { title: '名称', key: 'name' },
+  { title: '密钥值', key: 'keyValue', ellipsis: { tooltip: true } },
+  {
+    title: '关联模型',
+    key: 'modelIds',
+    render: (row: VirtualKey) => {
+      const modelIds: string[] = [];
+      if (row.modelId) modelIds.push(row.modelId);
+      if (row.modelIds && Array.isArray(row.modelIds)) {
+        modelIds.push(...row.modelIds);
+      }
+
+      const uniqueModelIds = [...new Set(modelIds)];
+      if (uniqueModelIds.length === 0) return '-';
+
+      const models = uniqueModelIds.map(id => modelStore.models.find(m => m.id === id)).filter(Boolean);
+
+      return h(NSpace, { size: 4, wrap: true }, {
+        default: () => models.map(model => {
+          if (!model) return null;
+          if (model.isVirtual) {
+            return h(NTag, { type: 'info', size: 'small', round: true }, { default: () => model.name });
+          }
+          return h(NTag, { type: 'default', size: 'small' }, { default: () => model.name });
+        }).filter(Boolean),
+      });
+    },
+  },
+  {
+    title: '状态',
+    key: 'enabled',
+    render: (row: VirtualKey) => h(NTag, { type: row.enabled ? 'success' : 'default' }, { default: () => row.enabled ? '启用' : '禁用' }),
+  },
+  {
+    title: '速率限制',
+    key: 'rateLimit',
+    render: (row: VirtualKey) => row.rateLimit ? `${row.rateLimit} 请求/分钟` : '-',
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    render: (row: VirtualKey) => h(NSpace, null, {
+      default: () => [
+        h(NButton, { size: 'small', onClick: () => copyKeyValue(row.keyValue) }, { default: () => '复制' }),
+        h(NButton, { size: 'small', onClick: () => handleEdit(row) }, { default: () => '编辑' }),
+        h(NPopconfirm, {
+          onPositiveClick: () => handleDelete(row.id),
+        }, {
+          trigger: () => h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
+          default: () => '确定删除此虚拟密钥吗？',
+        }),
+      ],
+    }),
+  },
+];
+
+function handleEdit(vk: VirtualKey) {
+  editingId.value = vk.id;
+  const modelIds: string[] = [];
+  if (vk.modelId) modelIds.push(vk.modelId);
+  if (vk.modelIds && Array.isArray(vk.modelIds)) {
+    modelIds.push(...vk.modelIds);
+  }
+
+  formValue.value = {
+    name: vk.name,
+    modelIds: [...new Set(modelIds)],
+    keyType: 'auto',
+    customKey: '',
+    rateLimit: vk.rateLimit || undefined,
+    enabled: vk.enabled,
+  };
+  showModal.value = true;
+}
+
+async function handleDelete(id: string) {
+  try {
+    await virtualKeyApi.delete(id);
+    message.success('删除成功');
+    await virtualKeyStore.fetchVirtualKeys();
+  } catch (error: any) {
+    message.error(error.message);
+  }
+}
+
+async function handleSubmit() {
+  try {
+    await formRef.value?.validate();
+    submitting.value = true;
+
+    if (editingId.value) {
+      await virtualKeyApi.update(editingId.value, {
+        name: formValue.value.name,
+        modelIds: formValue.value.modelIds,
+        enabled: formValue.value.enabled,
+        rateLimit: formValue.value.rateLimit,
+      });
+      message.success('更新成功');
+      showModal.value = false;
+    } else {
+      const result = await virtualKeyApi.create(formValue.value);
+      createdKeyValue.value = result.keyValue;
+      showModal.value = false;
+      showKeyModal.value = true;
+    }
+
+    resetForm();
+    await virtualKeyStore.fetchVirtualKeys();
+  } catch (error: any) {
+    if (error.message) {
+      message.error(error.message);
+    }
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function resetForm() {
+  editingId.value = null;
+  formValue.value = {
+    name: '',
+    modelIds: [],
+    keyType: 'auto',
+    customKey: '',
+    rateLimit: undefined,
+    enabled: true,
+  };
+}
+
+function copyKeyValue(keyValue: string) {
+  navigator.clipboard.writeText(keyValue);
+  message.success('已复制到剪贴板');
+}
+
+function copyKey() {
+  navigator.clipboard.writeText(createdKeyValue.value);
+  message.success('已复制到剪贴板');
+}
+
+onMounted(async () => {
+  await Promise.all([
+    virtualKeyStore.fetchVirtualKeys(),
+    modelStore.fetchModels(),
+  ]);
+});
+
+watch(showModal, async (val) => {
+  if (val) {
+    await modelStore.fetchModels();
+  }
+});
+
+</script>
+
+<style scoped>
+.virtual-keys-view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0;
+}
+
+.table-card {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+  overflow-x: auto;
+}
+
+.key-modal :deep(.n-card) {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+}
+
+.key-modal :deep(.n-card__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.key-modal :deep(.n-card__content) {
+  padding: 16px 20px;
+  max-height: calc(50vh - 140px);
+  overflow-y: auto;
+}
+
+.key-modal :deep(.n-card__content)::-webkit-scrollbar {
+  width: 6px;
+}
+
+.key-modal :deep(.n-card__content)::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.key-modal :deep(.n-card__content)::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 3px;
+}
+
+.key-modal :deep(.n-card__content)::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+.key-modal :deep(.n-card__footer) {
+  padding: 12px 20px;
+  border-top: 1px solid #e8e8e8;
+}
+</style>
+
