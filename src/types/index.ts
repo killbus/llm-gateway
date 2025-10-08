@@ -29,6 +29,7 @@ export interface VirtualKey {
   routing_config: string | null;
   enabled: number;
   rate_limit: number | null;
+  cache_enabled: number;
   created_at: number;
   updated_at: number;
 }

@@ -39,6 +39,7 @@ export interface VirtualKey {
   routingConfig?: RoutingConfig | null;
   enabled: boolean;
   rateLimit?: number | null;
+  cacheEnabled: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -107,6 +108,7 @@ export interface CreateVirtualKeyRequest {
   customKey?: string;
   rateLimit?: number;
   enabled?: boolean;
+  cacheEnabled?: boolean;
 }
 
 export interface UpdateVirtualKeyRequest {
@@ -118,5 +120,6 @@ export interface UpdateVirtualKeyRequest {
   routingConfig?: RoutingConfig;
   enabled?: boolean;
   rateLimit?: number;
+  cacheEnabled?: boolean;
 }
 

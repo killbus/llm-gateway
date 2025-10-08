@@ -28,7 +28,7 @@
           >
             登录
           </n-button>
-          <n-button text block @click="$router.push('/register')">
+          <n-button v-if="allowRegistration" text block @click="$router.push('/register')">
             还没有账号？立即注册
           </n-button>
         </n-space>
@@ -38,14 +38,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMessage, NCard, NForm, NFormItem, NInput, NButton, NSpace } from 'naive-ui';
 import { useAuthStore } from '@/stores/auth';
+import { configApi } from '@/api/config';
+
 
 const router = useRouter();
 const message = useMessage();
 const authStore = useAuthStore();
+
+const allowRegistration = ref(true);
+
+onMounted(async () => {
+  try {
+    const s = await configApi.getSystemSettings();
+    allowRegistration.value = s.allowRegistration;
+  } catch (e) {}
+});
+
 
 const formRef = ref();
 const loading = ref(false);
@@ -86,7 +98,7 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ffffff;
 }
 
 .auth-card {

@@ -56,6 +56,9 @@
         <n-form-item label="速率限制" path="rateLimit">
           <n-input-number v-model:value="formValue.rateLimit" placeholder="请求/分钟" :min="0" style="width: 100%" size="small" />
         </n-form-item>
+        <n-form-item label="启用缓存">
+          <n-switch v-model:value="formValue.cacheEnabled" size="small" />
+        </n-form-item>
         <n-form-item label="启用">
           <n-switch v-model:value="formValue.enabled" size="small" />
         </n-form-item>
@@ -134,6 +137,7 @@ const formValue = ref({
   customKey: '',
   rateLimit: undefined as number | undefined,
   enabled: true,
+  cacheEnabled: false,
 });
 
 const modelOptions = computed(() => {
@@ -208,6 +212,16 @@ const columns = [
     render: (row: VirtualKey) => h(NTag, { type: row.enabled ? 'success' : 'default' }, { default: () => row.enabled ? '启用' : '禁用' }),
   },
   {
+    title: '缓存',
+    key: 'cacheEnabled',
+    render: (row: VirtualKey) => {
+      if (!row.cacheEnabled) {
+        return h(NTag, { type: 'default', size: 'small' }, { default: () => '未启用' });
+      }
+      return h(NTag, { type: 'success', size: 'small' }, { default: () => '已启用' });
+    },
+  },
+  {
     title: '速率限制',
     key: 'rateLimit',
     render: (row: VirtualKey) => row.rateLimit ? `${row.rateLimit} 请求/分钟` : '-',
@@ -245,6 +259,7 @@ function handleEdit(vk: VirtualKey) {
     customKey: '',
     rateLimit: vk.rateLimit || undefined,
     enabled: vk.enabled,
+    cacheEnabled: vk.cacheEnabled,
   };
   showModal.value = true;
 }
@@ -270,6 +285,7 @@ async function handleSubmit() {
         modelIds: formValue.value.modelIds,
         enabled: formValue.value.enabled,
         rateLimit: formValue.value.rateLimit,
+        cacheEnabled: formValue.value.cacheEnabled,
       });
       message.success('更新成功');
       showModal.value = false;
@@ -300,6 +316,7 @@ function resetForm() {
     customKey: '',
     rateLimit: undefined,
     enabled: true,
+    cacheEnabled: false,
   };
 }
 

@@ -1,13 +1,21 @@
 import { FastifyInstance } from 'fastify';
 import { appConfig } from '../config/index.js';
 import { memoryLogger } from '../services/logger.js';
-import { apiRequestDb, routingConfigDb, modelDb } from '../db/index.js';
+import { apiRequestDb, routingConfigDb, modelDb, systemConfigDb } from '../db/index.js';
 import { generatePortkeyConfig } from '../services/config-generator.js';
 import { portkeyManager } from '../services/portkey-manager.js';
 import { nanoid } from 'nanoid';
 
+
 export async function configRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', fastify.authenticate);
+
+  fastify.post('/system-settings', async (request) => {
+    const { allowRegistration } = request.body as { allowRegistration: boolean };
+    await systemConfigDb.set('allow_registration', allowRegistration ? 'true' : 'false', '是否允许新用户注册');
+    return { success: true };
+  });
+
 
   fastify.get('/gateway-status', async () => {
     const endpoints = ['/v1/models', '/v1', '/'];

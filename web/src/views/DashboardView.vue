@@ -86,6 +86,30 @@
             </n-statistic>
           </n-card>
         </n-gi>
+        <n-gi>
+          <n-card class="stat-card">
+            <n-statistic label="缓存命中">
+              <template #default>
+                <span class="stat-value stat-value-success">{{ formatNumber(stats?.cacheHits || 0) }}</span>
+              </template>
+              <template #suffix>
+                <span class="stat-suffix">次</span>
+              </template>
+            </n-statistic>
+          </n-card>
+        </n-gi>
+        <n-gi>
+          <n-card class="stat-card">
+            <n-statistic label="缓存命中率">
+              <template #default>
+                <span class="stat-value" :class="{ 'stat-value-success': cacheHitRate > 20 }">{{ formatPercentage(cacheHitRate) }}</span>
+              </template>
+              <template #suffix>
+                <span class="stat-suffix">%</span>
+              </template>
+            </n-statistic>
+          </n-card>
+        </n-gi>
       </n-grid>
 
       <n-card class="trend-card" title="请求趋势">
@@ -179,6 +203,11 @@ const recentRequestsCount = computed(() => {
   if (trendData.value.length === 0) return 0;
   const lastHourData = trendData.value.slice(-1)[0];
   return lastHourData?.requestCount || 0;
+});
+
+const cacheHitRate = computed(() => {
+  if (!stats.value || stats.value.totalRequests === 0) return 0;
+  return (stats.value.cacheHits / stats.value.totalRequests) * 100;
 });
 
 function formatNumber(num: number): string {

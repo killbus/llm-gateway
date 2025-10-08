@@ -374,6 +374,12 @@ export async function proxyRoutes(fastify: FastifyInstance) {
         portkeyConfig.custom_host = provider.base_url;
       }
 
+      if (virtualKey.cache_enabled === 1) {
+        portkeyConfig.cache = {
+          mode: 'simple'
+        };
+      }
+
       const path = request.url.replace('/v1', '');
       const portkeyUrl = `${appConfig.portkeyGatewayUrl}/v1${path}`;
 
@@ -503,8 +509,12 @@ export async function proxyRoutes(fastify: FastifyInstance) {
       );
 
       const responseHeaders: Record<string, string> = {};
+      let cacheHit = 0;
       Object.entries(response.headers).forEach(([key, value]) => {
         const lowerKey = key.toLowerCase();
+        if (lowerKey === 'x-portkey-cache-status' && value === 'HIT') {
+          cacheHit = 1;
+        }
         if (!lowerKey.startsWith('transfer-encoding') &&
             !lowerKey.startsWith('connection') &&
             lowerKey !== 'content-length' &&
@@ -582,6 +592,7 @@ export async function proxyRoutes(fastify: FastifyInstance) {
         error_message: isSuccess ? undefined : JSON.stringify(responseData),
         request_body: truncatedRequest,
         response_body: truncatedResponse,
+        cache_hit: cacheHit,
       });
 
       if (isSuccess) {

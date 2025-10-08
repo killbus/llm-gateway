@@ -11,6 +11,7 @@ import { providerRoutes } from './routes/providers.js';
 import { modelRoutes } from './routes/models.js';
 import { virtualKeyRoutes } from './routes/virtual-keys.js';
 import { configRoutes } from './routes/config.js';
+import { publicConfigRoutes } from './routes/public-config.js';
 import { proxyRoutes } from './routes/proxy.js';
 import { memoryLogger } from './services/logger.js';
 
@@ -63,6 +64,7 @@ fastify.get('/health', async () => {
 
 await fastify.register(proxyRoutes);
 await fastify.register(authRoutes, { prefix: '/api/auth' });
+await fastify.register(publicConfigRoutes, { prefix: '/api/admin/config' });
 await fastify.register(providerRoutes, { prefix: '/api/admin/providers' });
 await fastify.register(modelRoutes, { prefix: '/api/admin/models' });
 await fastify.register(virtualKeyRoutes, { prefix: '/api/admin/virtual-keys' });

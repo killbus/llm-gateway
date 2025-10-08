@@ -17,6 +17,7 @@ const createVirtualKeySchema = z.object({
   customKey: z.string().optional(),
   rateLimit: z.number().optional(),
   enabled: z.boolean().optional(),
+  cacheEnabled: z.boolean().optional(),
 });
 
 const updateVirtualKeySchema = z.object({
@@ -28,6 +29,7 @@ const updateVirtualKeySchema = z.object({
   routingConfig: z.record(z.any()).optional(),
   enabled: z.boolean().optional(),
   rateLimit: z.number().optional(),
+  cacheEnabled: z.boolean().optional(),
 });
 
 const validateKeySchema = z.object({
@@ -51,6 +53,7 @@ export async function virtualKeyRoutes(fastify: FastifyInstance) {
         routingConfig: vk.routing_config ? JSON.parse(vk.routing_config) : null,
         enabled: vk.enabled === 1,
         rateLimit: vk.rate_limit,
+        cacheEnabled: vk.cache_enabled === 1,
         createdAt: vk.created_at,
         updatedAt: vk.updated_at,
       })),
@@ -76,6 +79,7 @@ export async function virtualKeyRoutes(fastify: FastifyInstance) {
       routingConfig: vk.routing_config ? JSON.parse(vk.routing_config) : null,
       enabled: vk.enabled === 1,
       rateLimit: vk.rate_limit,
+      cacheEnabled: vk.cache_enabled === 1,
       createdAt: vk.created_at,
       updatedAt: vk.updated_at,
     };
@@ -140,6 +144,7 @@ export async function virtualKeyRoutes(fastify: FastifyInstance) {
       routing_config: body.routingConfig ? JSON.stringify(body.routingConfig) : null,
       enabled: body.enabled !== false ? 1 : 0,
       rate_limit: body.rateLimit || null,
+      cache_enabled: body.cacheEnabled ? 1 : 0,
     });
 
     await generatePortkeyConfig();
@@ -156,6 +161,7 @@ export async function virtualKeyRoutes(fastify: FastifyInstance) {
         routingConfig: vk.routing_config ? JSON.parse(vk.routing_config) : null,
         enabled: vk.enabled === 1,
         rateLimit: vk.rate_limit,
+        cacheEnabled: vk.cache_enabled === 1,
         createdAt: vk.created_at,
         updatedAt: vk.updated_at,
       },
@@ -204,6 +210,7 @@ export async function virtualKeyRoutes(fastify: FastifyInstance) {
     if (body.routingConfig !== undefined) updates.routing_config = JSON.stringify(body.routingConfig);
     if (body.enabled !== undefined) updates.enabled = body.enabled ? 1 : 0;
     if (body.rateLimit !== undefined) updates.rate_limit = body.rateLimit;
+    if (body.cacheEnabled !== undefined) updates.cache_enabled = body.cacheEnabled ? 1 : 0;
 
     await virtualKeyDb.update(id, updates);
     await generatePortkeyConfig();
@@ -220,6 +227,7 @@ export async function virtualKeyRoutes(fastify: FastifyInstance) {
       routingConfig: updated.routing_config ? JSON.parse(updated.routing_config) : null,
       enabled: updated.enabled === 1,
       rateLimit: updated.rate_limit,
+      cacheEnabled: updated.cache_enabled === 1,
       createdAt: updated.created_at,
       updatedAt: updated.updated_at,
     };

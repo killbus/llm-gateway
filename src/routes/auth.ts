@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import { userDb } from '../db/index.js';
+import { userDb, systemConfigDb } from '../db/index.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { validateUsername, validatePassword } from '../utils/validation.js';
 
@@ -18,6 +18,11 @@ const loginSchema = z.object({
 export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/register', async (request, reply) => {
     const body = registerSchema.parse(request.body);
+    const allowCfg = systemConfigDb.get('allow_registration');
+    if (allowCfg && allowCfg.value === 'false') {
+      return reply.code(403).send({ error: '当前已关闭用户注册' });
+    }
+
 
     const usernameValidation = validateUsername(body.username);
     if (!usernameValidation.valid) {

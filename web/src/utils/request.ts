@@ -28,9 +28,11 @@ request.interceptors.response.use(
     if (error.response?.status === 401) {
       const authStore = useAuthStore();
       authStore.logout();
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login';
+      }
     }
-    
+
     const message = error.response?.data?.error || '请求失败';
     return Promise.reject(new Error(message));
   }

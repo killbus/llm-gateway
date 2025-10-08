@@ -107,6 +107,11 @@ function createTables() {
     )
   `);
 
+  try {
+    db.run('ALTER TABLE virtual_keys ADD COLUMN cache_enabled INTEGER DEFAULT 0');
+  } catch (e) {
+  }
+
   db.run('CREATE INDEX IF NOT EXISTS idx_virtual_keys_hash ON virtual_keys(key_hash)');
   db.run('CREATE INDEX IF NOT EXISTS idx_virtual_keys_value ON virtual_keys(key_value)');
   db.run('CREATE INDEX IF NOT EXISTS idx_virtual_keys_provider ON virtual_keys(provider_id)');
@@ -146,6 +151,11 @@ function createTables() {
 
   try {
     db.run('ALTER TABLE api_requests ADD COLUMN response_body TEXT');
+  } catch (e) {
+  }
+
+  try {
+    db.run('ALTER TABLE api_requests ADD COLUMN cache_hit INTEGER DEFAULT 0');
   } catch (e) {
   }
 
@@ -415,6 +425,7 @@ export const virtualKeyDb = {
       rate_limit: row[10] as number | null,
       created_at: row[11] as number,
       updated_at: row[12] as number,
+      cache_enabled: (row[13] as number) || 0,
     }));
   },
 
@@ -436,6 +447,7 @@ export const virtualKeyDb = {
       rate_limit: row[10] as number | null,
       created_at: row[11] as number,
       updated_at: row[12] as number,
+      cache_enabled: (row[13] as number) || 0,
     };
   },
 
@@ -457,6 +469,7 @@ export const virtualKeyDb = {
       rate_limit: row[10] as number | null,
       created_at: row[11] as number,
       updated_at: row[12] as number,
+      cache_enabled: (row[13] as number) || 0,
     };
   },
 
@@ -466,8 +479,8 @@ export const virtualKeyDb = {
       `INSERT INTO virtual_keys (
         id, key_value, key_hash, name, provider_id, model_id,
         routing_strategy, model_ids, routing_config,
-        enabled, rate_limit, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        enabled, rate_limit, cache_enabled, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         vk.id,
         vk.key_value,
@@ -480,6 +493,7 @@ export const virtualKeyDb = {
         vk.routing_config || null,
         vk.enabled,
         vk.rate_limit,
+        vk.cache_enabled || 0,
         now,
         now
       ]
@@ -570,14 +584,15 @@ export const apiRequestDb = {
     error_message?: string;
     request_body?: string;
     response_body?: string;
+    cache_hit?: number;
   }): Promise<void> {
     const now = Date.now();
     db.run(
       `INSERT INTO api_requests (
         id, virtual_key_id, provider_id, model,
         prompt_tokens, completion_tokens, total_tokens,
-        status, response_time, error_message, request_body, response_body, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        status, response_time, error_message, request_body, response_body, cache_hit, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         request.id,
         request.virtual_key_id || null,
@@ -591,6 +606,7 @@ export const apiRequestDb = {
         request.error_message || null,
         request.request_body || null,
         request.response_body || null,
+        request.cache_hit || 0,
         now,
       ]
     );
@@ -608,7 +624,8 @@ export const apiRequestDb = {
         SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful_requests,
         SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as failed_requests,
         SUM(total_tokens) as total_tokens,
-        AVG(response_time) as avg_response_time
+        AVG(response_time) as avg_response_time,
+        SUM(CASE WHEN cache_hit = 1 THEN 1 ELSE 0 END) as cache_hits
       FROM api_requests
       WHERE created_at >= ? AND created_at <= ?`,
       [startTime, endTime]
@@ -621,6 +638,7 @@ export const apiRequestDb = {
         failedRequests: 0,
         totalTokens: 0,
         avgResponseTime: 0,
+        cacheHits: 0,
       };
     }
 
@@ -631,6 +649,7 @@ export const apiRequestDb = {
       failedRequests: (row[2] as number) || 0,
       totalTokens: (row[3] as number) || 0,
       avgResponseTime: (row[4] as number) || 0,
+      cacheHits: (row[5] as number) || 0,
     };
   },
 

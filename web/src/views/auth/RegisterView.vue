@@ -1,11 +1,16 @@
 <template>
   <div class="auth-container">
     <n-card class="auth-card" title="注册">
+      <n-alert v-if="!allowRegistration" type="warning" style="margin-bottom: 12px;">
+        当前已关闭注册，仅允许已有用户登录
+      </n-alert>
+
       <n-form ref="formRef" :model="formValue" :rules="rules" size="large">
         <n-form-item path="username" label="用户名">
           <n-input
             v-model:value="formValue.username"
             placeholder="请输入用户名"
+            :disabled="!allowRegistration"
           />
         </n-form-item>
         <n-form-item path="password" label="密码">
@@ -14,6 +19,7 @@
             type="password"
             show-password-on="click"
             placeholder="请输入密码"
+            :disabled="!allowRegistration"
           />
         </n-form-item>
         <n-form-item path="confirmPassword" label="确认密码">
@@ -23,6 +29,7 @@
             show-password-on="click"
             placeholder="请再次输入密码"
             @keydown.enter="handleRegister"
+            :disabled="!allowRegistration"
           />
         </n-form-item>
         <n-space vertical :size="16">
@@ -31,6 +38,7 @@
             block
             size="large"
             :loading="loading"
+            :disabled="!allowRegistration"
             @click="handleRegister"
           >
             注册
@@ -45,14 +53,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useMessage, NCard, NForm, NFormItem, NInput, NButton, NSpace } from 'naive-ui';
+import { useMessage, NCard, NForm, NFormItem, NInput, NButton, NSpace, NAlert } from 'naive-ui';
 import { useAuthStore } from '@/stores/auth';
+import { configApi } from '@/api/config';
+
 
 const router = useRouter();
 const message = useMessage();
 const authStore = useAuthStore();
+
+const allowRegistration = ref(true);
+
+onMounted(async () => {
+  try {
+    const s = await configApi.getSystemSettings();
+    allowRegistration.value = s.allowRegistration;
+  } catch (e) {}
+});
+
 
 const formRef = ref();
 const loading = ref(false);
@@ -109,7 +129,7 @@ async function handleRegister() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ffffff;
 }
 
 .auth-card {

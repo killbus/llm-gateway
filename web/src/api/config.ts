@@ -24,6 +24,7 @@ export interface ApiStats {
   failedRequests: number;
   totalTokens: number;
   avgResponseTime: number;
+  cacheHits: number;
 }
 
 export interface TrendData {
@@ -128,6 +129,14 @@ export const configApi = {
 
   deleteRoutingConfig(id: string): Promise<{ success: boolean }> {
     return request.delete(`/admin/config/routing-configs/${id}`);
+  },
+
+  getSystemSettings(): Promise<{ allowRegistration: boolean }> {
+    return request.get('/admin/config/system-settings');
+  },
+
+  updateSystemSettings(data: { allowRegistration: boolean }): Promise<{ success: boolean }> {
+    return request.post('/admin/config/system-settings', data);
   },
 };
 

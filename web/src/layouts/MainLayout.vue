@@ -68,7 +68,6 @@ import {
   TerminalOutline,
   CloudOutline,
   CubeOutline,
-  ListOutline,
 } from '@vicons/ionicons5';
 import { useAuthStore } from '@/stores/auth';
 
@@ -127,14 +126,9 @@ const menuOptions = [
         icon: () => h(NIcon, null, { default: () => h(DocumentTextOutline) }),
       },
       {
-        label: '系统日志',
+        label: '日志查看',
         key: 'logs',
         icon: () => h(NIcon, null, { default: () => h(TerminalOutline) }),
-      },
-      {
-        label: '请求日志',
-        key: 'api-requests',
-        icon: () => h(NIcon, null, { default: () => h(ListOutline) }),
       },
     ],
   },
