@@ -316,6 +316,7 @@ export async function resolveSmartRouting(
       // 从 provider 下查找匹配的真实模型
       const providerModels = await modelDb.getByProviderId(selectedTarget.provider);
       resolvedModel = providerModels.find(m =>
+        m.enabled === 1 &&
         m.is_virtual !== 1 && (
           m.model_identifier === selectedTarget.override_params!.model ||
           m.name === selectedTarget.override_params!.model
@@ -417,6 +418,7 @@ export async function resolveExpertRouting(
       // 从 provider 下查找匹配的真实模型（类似智能路由的处理）
       const providerModels = await modelDb.getByProviderId(result.providerId);
       resolvedModel = providerModels.find(m =>
+        m.enabled === 1 &&
         m.is_virtual !== 1 && (
           m.model_identifier === result.modelOverride ||
           m.name === result.modelOverride
